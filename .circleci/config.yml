@@ -1,0 +1,54 @@
+version: 2
+
+shared: &shared
+  docker:
+    - image: docker:stable
+
+  steps:
+    - checkout
+    - setup_remote_docker
+    - run:
+        name: Build ${TAG} Docker image
+        command: |
+          docker build \
+            --no-cache \
+            -t saltyrtc/circleci-image-java:${TAG} \
+            ${TAG}
+    - deploy:
+        name: Push Docker image
+        command: |
+          docker login -u $DOCKER_USER -p $DOCKER_API_KEY && \
+          docker push saltyrtc/circleci-image-java:${TAG}
+
+
+jobs:
+  build-openjdk8:
+    <<: *shared
+    environment:
+      - TAG: openjdk8
+
+  build-openjdk9:
+    <<: *shared
+    environment:
+      - TAG: openjdk9
+
+workflows:
+  version: 2
+
+  # Build on push
+  push:
+    jobs: &jobs
+      - build-openjdk8
+      - build-openjdk9
+
+  # Build every week on Monday at 04:00 am
+  weekly:
+    jobs: *jobs
+    triggers:
+      - schedule:
+          cron: "0 4 * * 1"
+          filters:
+            branches:
+              only:
+                - master
+
